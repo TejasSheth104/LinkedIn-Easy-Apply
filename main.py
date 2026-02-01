@@ -48,6 +48,68 @@ def scroll_and_collect_jobs(page, max_jobs=10):
     print(f"✅ Collected {len(job_links)} Easy Apply job links")
     return list(job_links)
 
+def filter_easy_apply_jobs(page, job_links):
+    """
+    Filter job links to only include those with the Easy Apply button.
+
+    Args:
+        page (Page): The Playwright page object.
+        job_links (list): A list of job links to filter.
+
+    Returns:
+        list: A list of job links with Easy Apply button.
+    """
+    easy_apply_jobs = []
+
+    for link in job_links:
+        if link.startswith("/"):
+            link = "https://www.linkedin.com" + link
+
+        page.goto(link)
+        page.wait_for_timeout(3000)
+
+        # Job title
+        title_elem = page.locator("h1.top-card-layout__title")
+        job_title = title_elem.inner_text().strip() if title_elem.count() > 0 else "UNKNOWN TITLE"
+
+        # Easy Apply button
+        easy_apply_btn = page.locator("button:has-text('Easy Apply')")
+
+        if easy_apply_btn.count() > 0:
+            print(f"✅ Easy Apply | {job_title}")
+            easy_apply_jobs.append({
+                "title": job_title,
+                "url": link
+            })
+        else:
+            print(f"❌ No Easy Apply | {job_title}")
+
+    return easy_apply_jobs
+
+def collect_job_links(page, max_jobs=25):
+    """
+    Collect job links from the page.
+
+    Args:
+        page (Page): The Playwright page object.
+        max_jobs (int): The maximum number of job links to collect.
+
+    Returns:
+        list: A list of job links.
+    """
+    page.wait_for_selector("a[href*='/jobs/view/']")
+
+    links = set()
+    cards = page.locator("a[href*='/jobs/view/']")
+
+    for i in range(min(cards.count(), max_jobs)):
+        href = cards.nth(i).get_attribute("href")
+        if href:
+            links.add(href.split("?")[0])
+
+    print(f"🔗 Collected {len(links)} job links")
+    return list(links)
+
 def main():
     """
     Main function to run the script.
@@ -87,8 +149,11 @@ def main():
                 search_url = f"https://www.linkedin.com/jobs/search/?keywords={kw}&f_LF=f_AL"
                 page.goto(search_url)
                 time.sleep(5)
-                jobs = scroll_and_collect_jobs(page, max_jobs=10)
-                easy_apply_jobs.extend(jobs)
+                job_links = collect_job_links(page, max_jobs=30)
+                easy_apply_jobs = filter_easy_apply_jobs(page, job_links)
+
+                print("🎯 Final Easy Apply jobs:")
+                print(easy_apply_jobs)
 
             print("All jobs collected", easy_apply_jobs)
 
